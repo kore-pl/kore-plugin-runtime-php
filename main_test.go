@@ -118,7 +118,7 @@ func TestServeShutdown(t *testing.T) {
 	}
 }
 
-// TestServeMethodOverPipe 通过 net.Pipe 走完整会话：php.versions 请求必须读回响应帧。
+// TestServeMethodOverPipe 通过 net.Pipe 走完整会话：runtime-php.versions 请求必须读回响应帧。
 func TestServeMethodOverPipe(t *testing.T) {
 	pluginConn, kernelConn := net.Pipe()
 	defer func() { _ = kernelConn.Close() }()
@@ -126,7 +126,7 @@ func TestServeMethodOverPipe(t *testing.T) {
 	go func() { done <- serve(pluginConn, testConfig(), testLogger()); _ = pluginConn.Close() }()
 
 	request := &pluginapi.Request{
-		Type: pluginapi.TypeRequest, ID: "id-2", ReqID: "r-2", Method: "php.versions",
+		Type: pluginapi.TypeRequest, ID: "id-2", ReqID: "r-2", Method: "runtime-php.versions",
 		Params: json.RawMessage(`{}`),
 	}
 	if err := pluginapi.WriteJSON(kernelConn, request); err != nil {
@@ -138,7 +138,7 @@ func TestServeMethodOverPipe(t *testing.T) {
 		t.Fatalf("响应帧异常: %+v", env)
 	}
 	if response.Error != nil {
-		t.Fatalf("php.versions 意外错误: %v", response.Error)
+		t.Fatalf("runtime-php.versions 意外错误: %v", response.Error)
 	}
 	// 再发 shutdown 并配对读响应帧，保证 serve 正常退出。
 	shutdown := &pluginapi.Request{Type: pluginapi.TypeRequest, ID: "id-3", ReqID: "r-3", Method: "kore.shutdown"}

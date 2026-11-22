@@ -30,8 +30,8 @@ var methods = []struct {
 	method string
 	params string
 }{
-	{"versions", "php.versions", `{}`},
-	{"use", "php.use", `{"version":"8.1"}`},
+	{"versions", "runtime-php.versions", `{}`},
+	{"use", "runtime-php.use", `{"version":"8.1"}`},
 }
 
 // assertFault 对每个方法注入故障，断言返回 nil 结果 + 预期的协议错误码与类别关键词。

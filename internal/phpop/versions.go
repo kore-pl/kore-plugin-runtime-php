@@ -6,7 +6,7 @@ import (
 	"github.com/pengtang1024/kore/pkg/pluginapi"
 )
 
-// callVersions 处理 php.versions：校验 params 后返回逻辑版本列表（骨架口径不探测宿主）。
+// callVersions 处理 runtime-php.versions：校验 params 后返回逻辑版本列表（骨架口径不探测宿主）。
 func callVersions(raw json.RawMessage, exec Executor) (json.RawMessage, *pluginapi.Error) {
 	var p versionsParams
 	if perr := decodeParams(raw, &p); perr != nil {

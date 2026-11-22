@@ -15,6 +15,6 @@ func TestKillFault(t *testing.T) {
 
 // TestKillFaultContract 单独验证 kill 故障的错误体结构完整（真实调用，非空壳）。
 func TestKillFaultContract(t *testing.T) {
-	_, perr := phpop.Call("php.use", json.RawMessage(`{"version":"8.1"}`), faultExecutor{kind: phpop.FaultKill})
+	_, perr := phpop.Call("runtime-php.use", json.RawMessage(`{"version":"8.1"}`), faultExecutor{kind: phpop.FaultKill})
 	verifyErrorContract(t, perr)
 }

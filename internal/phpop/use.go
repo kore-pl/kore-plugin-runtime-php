@@ -6,7 +6,7 @@ import (
 	"github.com/pengtang1024/kore/pkg/pluginapi"
 )
 
-// callUse 处理 php.use：校验 version 白名单后返回切换结果（骨架口径不真切 FPM）。
+// callUse 处理 runtime-php.use：校验 version 白名单后返回切换结果（骨架口径不真切 FPM）。
 func callUse(raw json.RawMessage, exec Executor) (json.RawMessage, *pluginapi.Error) {
 	var p useParams
 	if perr := decodeParams(raw, &p); perr != nil {

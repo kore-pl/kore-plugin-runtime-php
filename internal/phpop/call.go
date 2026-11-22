@@ -27,13 +27,14 @@ func Call(method string, params json.RawMessage, exec Executor) (json.RawMessage
 	return nil, errNotFound(method)
 }
 
-// businessVerb 把 runtime-php.<verb> 或裸 <verb> 归一为动词名。
+// methodPrefix 是方法名的插件域前缀：协议要求 `<plugin-id>.<action>`（PLUGIN-PROTOCOL §7.2）。
+const methodPrefix = "runtime-php."
+
+// businessVerb 把 runtime-php.<verb> 归一为动词名；域不是本插件 id 的一律拒绝（不再接受裸动词或旧 php. 前缀）。
 func businessVerb(method string) (string, bool) {
-	verb := method
-	if strings.HasPrefix(method, "runtime-php.") {
-		verb = strings.TrimPrefix(method, "runtime-php.")
-	} else if strings.HasPrefix(method, "php.") {
-		verb = strings.TrimPrefix(method, "php.")
+	verb, ok := strings.CutPrefix(method, methodPrefix)
+	if !ok {
+		return "", false
 	}
 	switch verb {
 	case "versions", "use":

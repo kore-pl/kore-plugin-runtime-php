@@ -8,15 +8,11 @@ import (
 	"github.com/pengtang1024/kore/pkg/pluginapi"
 )
 
-// TestBusinessVerb 方法名归一化：php.<verb> / runtime-php.<verb> / 裸 <verb> 都接受。
+// TestBusinessVerb 方法名归一化：只接受 runtime-php.<verb>，域不符或裸动词一律拒绝。
 func TestBusinessVerb(t *testing.T) {
 	cases := map[string]string{
-		"php.versions":         "versions",
-		"php.use":              "use",
 		"runtime-php.versions": "versions",
 		"runtime-php.use":      "use",
-		"versions":             "versions",
-		"use":                  "use",
 	}
 	for method, want := range cases {
 		got, ok := businessVerb(method)
@@ -24,20 +20,22 @@ func TestBusinessVerb(t *testing.T) {
 			t.Fatalf("businessVerb(%q)=(%q,%v)，期望 (%q,true)", method, got, ok, want)
 		}
 	}
-	if _, ok := businessVerb("php.exec"); ok {
-		t.Fatal("php.exec 不应被接受")
+	for _, method := range []string{"runtime-php.exec", "php.versions", "php.use", "versions", "use", "runtime-php."} {
+		if _, ok := businessVerb(method); ok {
+			t.Fatalf("businessVerb(%q) 不应被接受", method)
+		}
 	}
 }
 
 // TestCallResults 两方法正常路径返回结构化结果，且白名单五个版本齐全。
 func TestCallResults(t *testing.T) {
-	versions, perr := Call("php.versions", json.RawMessage(`{}`), nil)
+	versions, perr := Call("runtime-php.versions", json.RawMessage(`{}`), nil)
 	if perr != nil || !strings.Contains(string(versions), `"count":5`) {
-		t.Fatalf("php.versions 结果=%s err=%v", versions, perr)
+		t.Fatalf("runtime-php.versions 结果=%s err=%v", versions, perr)
 	}
-	use, perr := Call("php.use", json.RawMessage(`{"version":"8.1"}`), nil)
+	use, perr := Call("runtime-php.use", json.RawMessage(`{"version":"8.1"}`), nil)
 	if perr != nil || !strings.Contains(string(use), `"version":"8.1"`) {
-		t.Fatalf("php.use 结果=%s err=%v", use, perr)
+		t.Fatalf("runtime-php.use 结果=%s err=%v", use, perr)
 	}
 	if !strings.Contains(string(use), `"applied":false`) {
 		t.Fatalf("骨架口径下 applied 应为 false: %s", use)
@@ -50,12 +48,12 @@ func TestCallParamValidation(t *testing.T) {
 		method string
 		params string
 	}{
-		{"php.versions", `[]`},
-		{"php.use", `not-json`},
-		{"php.use", `{"version":""}`},
-		{"php.use", `{"version":"5.6"}`},
-		{"php.use", `{"version":"9.0"}`},
-		{"php.use", `{"version":"8.1.2"}`},
+		{"runtime-php.versions", `[]`},
+		{"runtime-php.use", `not-json`},
+		{"runtime-php.use", `{"version":""}`},
+		{"runtime-php.use", `{"version":"5.6"}`},
+		{"runtime-php.use", `{"version":"9.0"}`},
+		{"runtime-php.use", `{"version":"8.1.2"}`},
 	}
 	for _, c := range bad {
 		_, perr := Call(c.method, json.RawMessage(c.params), nil)
@@ -67,7 +65,7 @@ func TestCallParamValidation(t *testing.T) {
 
 // TestCallUnknownMethod 未知方法返回 E_NOTFOUND。
 func TestCallUnknownMethod(t *testing.T) {
-	_, perr := Call("php.exec", json.RawMessage(`{}`), nil)
+	_, perr := Call("runtime-php.exec", json.RawMessage(`{}`), nil)
 	if perr == nil || perr.Code != pluginapi.E_NOTFOUND {
 		t.Fatalf("未知方法错误=%v，期望 E_NOTFOUND", perr)
 	}

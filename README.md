@@ -6,16 +6,16 @@ PHP 运行时插件（**骨架**）：覆盖多版本 PHP-FPM 管理 / 版本切
 
 - `kore.plugin.v1`，`lifecycle=lazy`，`depth_level=production`
 - 能力声明：`system:admin`
-- 方法：`php.versions`（同时接受 `runtime-php.versions` / 裸 `versions`）、`php.use`（同时接受 `runtime-php.use` / 裸 `use`）
+- 方法：`runtime-php.versions` / `runtime-php.use`（域必须等于插件 id `runtime-php`，PLUGIN-PROTOCOL §7.2；不接受裸动词或旧 `php.` 前缀，v0.1.0 无存量用户不做兼容层）
 - 握手的 stdout 留给协议帧，日志一律写 stderr
 
 ## 版本白名单（骨架口径）
 
-`php.use` 的 `version` 必须在白名单内：`7.4` / `8.0` / `8.1` / `8.2` / `8.3`，精确匹配，不接受 `8.1.2` 之类的补丁版本号。版本参数仅做逻辑校验，**不执行 systemctl / 不连接 FPM / 不读写宿主配置**：
+`runtime-php.use` 的 `version` 必须在白名单内：`7.4` / `8.0` / `8.1` / `8.2` / `8.3`，精确匹配，不接受 `8.1.2` 之类的补丁版本号。版本参数仅做逻辑校验，**不执行 systemctl / 不连接 FPM / 不读写宿主配置**：
 
 - 非法或白名单外的版本返回 `E_INVALID`
 - 未知方法返回 `E_NOTFOUND`
-- `php.versions` 返回白名单内的逻辑版本列表，当前逻辑版本为 `8.2`
+- `runtime-php.versions` 返回白名单内的逻辑版本列表，当前逻辑版本为 `8.2`
 
 ## 四类故障注入
 

@@ -15,8 +15,8 @@ func TestDispatchMethods(t *testing.T) {
 		params string
 		want   string
 	}{
-		{"php.versions", `{}`, `"count":5`},
-		{"php.use", `{"version":"8.1"}`, `"version":"8.1"`},
+		{"runtime-php.versions", `{}`, `"count":5`},
+		{"runtime-php.use", `{"version":"8.1"}`, `"version":"8.1"`},
 		{"runtime-php.versions", `{}`, `"current":"8.2"`},
 	}
 	for _, c := range cases {
@@ -44,12 +44,12 @@ func TestDispatchReject(t *testing.T) {
 		params string
 		code   string
 	}{
-		{"php.use", `{"version":"9.9"}`, pluginapi.E_INVALID},
-		{"php.use", `{"version":"7.4.0"}`, pluginapi.E_INVALID},
-		{"php.use", `{}`, pluginapi.E_INVALID},
-		{"php.use", `{"version":8}`, pluginapi.E_INVALID},
-		{"php.versions", `[]`, pluginapi.E_INVALID},
-		{"php.exec", `{}`, pluginapi.E_NOTFOUND},
+		{"runtime-php.use", `{"version":"9.9"}`, pluginapi.E_INVALID},
+		{"runtime-php.use", `{"version":"7.4.0"}`, pluginapi.E_INVALID},
+		{"runtime-php.use", `{}`, pluginapi.E_INVALID},
+		{"runtime-php.use", `{"version":8}`, pluginapi.E_INVALID},
+		{"runtime-php.versions", `[]`, pluginapi.E_INVALID},
+		{"runtime-php.exec", `{}`, pluginapi.E_NOTFOUND},
 	}
 	for _, c := range cases {
 		req := &pluginapi.Request{
