@@ -13,5 +13,5 @@
   "depends_on": [],
   "conflicts": [],
   "scenario_tags": ["web", "app"],
-  "size_bytes": 1263712
+  "size_bytes": 1263386
 }
