@@ -32,6 +32,7 @@ type config struct {
 	version      string
 	requiresKore string
 	capabilities []string
+	root         string
 	startedAt    time.Time
 }
 
@@ -51,10 +52,14 @@ func loadConfig() (config, error) {
 		version:      m.Version,
 		requiresKore: m.RequiresKore,
 		capabilities: m.Capabilities,
+		root:         os.Getenv("KORE_PHP_ROOT"),
 		startedAt:    time.Now(),
 	}
 	if cfg.id == "" {
 		cfg.id = m.ID
+	}
+	if cfg.root == "" {
+		cfg.root = "/var/lib/kore/php"
 	}
 	if cfg.socket == "" {
 		return config{}, fmt.Errorf("缺少环境变量 KORE_PLUGIN_SOCK")

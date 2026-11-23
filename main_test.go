@@ -16,9 +16,10 @@ import (
 func testConfig() config {
 	return config{
 		id:           "runtime-php",
-		version:      "0.1.0",
+		version:      "0.2.0",
 		requiresKore: ">=0.1.0 <0.2.0",
 		capabilities: []string{"system:admin"},
+		root:         "/var/lib/kore/php",
 		startedAt:    time.Now(),
 	}
 }
@@ -77,7 +78,7 @@ func TestHandshake(t *testing.T) {
 	if params.PluginID != "runtime-php" || params.ID != "runtime-php" {
 		t.Fatalf("plugin_id/id=%q/%q，期望 runtime-php", params.PluginID, params.ID)
 	}
-	if params.Protocol != pluginapi.Protocol || params.Version != "0.1.0" {
+	if params.Protocol != pluginapi.Protocol || params.Version != "0.2.0" {
 		t.Fatalf("protocol/version=%q/%q 不符合 §5", params.Protocol, params.Version)
 	}
 	if params.PID != os.Getpid() {

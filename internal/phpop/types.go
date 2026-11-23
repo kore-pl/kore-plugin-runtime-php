@@ -1,10 +1,56 @@
-// Package phpop 实现 runtime-php 插件的方法面：版本号白名单校验、参数校验与结构化结果。
-// 本包只做逻辑校验与执行面调用，不真起 FPM 进程、不内置 php/fpm 二进制（骨架口径）。
+// Package phpop 实现 runtime-php 插件的方法面：检测宿主已安装的 PHP CLI、
+// 汇总单个版本详情、扫描 PHP 项目与健康检查。
+//
+// 安全口径：只读——不执行项目脚本、不写宿主文件；所有外部命令固定 argv + 5s 超时；
+// root 参数必须落在白名单目录内并做符号链接二次校验。
 package phpop
 
-import "fmt"
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"time"
+)
 
-// FaultKind 标识一次故障注入的类别。
+// 采集与安全常量。
+const (
+	// CommandTimeout 是单条外部命令（php）的硬超时。
+	CommandTimeout = 5 * time.Second
+	// MaxComposerJSONBytes 是 composer.json 的读取上限（只读前 64 KiB，防巨大文件）。
+	MaxComposerJSONBytes = 64 * 1024
+	// MaxCommandOutputBytes 是单条命令捕获的 stdout/stderr 上限（1 MiB）：
+	// php -i 正常约 100 KiB，设上限防被替换成 rogue php 时刷爆插件内存（plugins ≤24 MiB）。
+	MaxCommandOutputBytes = 1 << 20
+	// MaxScanDepth 是项目扫描的目录深度上限（root 为 0，最多再下探 3 层）。
+	MaxScanDepth = 3
+	// MaxScanEntries 是项目扫描的目录条目上限。
+	MaxScanEntries = 200
+	// NoPHPHint 是未检测到 PHP 时的降级提示（versions 不报错）。
+	NoPHPHint = "未检测到 PHP，可执行 apt install php-cli，或用 phpenv / 官方包安装后把 php 放进 PATH"
+	// SAPI 是本插件探测的接口类型：只管理 CLI，不管理 FPM 进程。
+	SAPI = "cli"
+)
+
+// Source 标识一个 PHP 可执行文件的发现渠道。
+type Source string
+
+const (
+	// SourcePath 表示从 PATH 中找到（php）。
+	SourcePath Source = "path"
+	// SourceKnownPath 表示从常见安装路径找到（/usr/bin、/usr/local/bin、/opt/php*、/etc/alternatives）。
+	SourceKnownPath Source = "known_path"
+	// SourcePhpenv 表示从 ~/.phpenv/versions/*/bin/php 找到。
+	SourcePhpenv Source = "phpenv"
+)
+
+// 健康检查状态取值。
+const (
+	StatusPass = "pass"
+	StatusWarn = "warn"
+	StatusFail = "fail"
+)
+
+// FaultKind 标识一次故障注入的类别（production 级骨架的故障注入契约）。
 type FaultKind string
 
 const (
@@ -29,38 +75,113 @@ func NewFaultError(kind FaultKind, message string) *FaultError {
 	return &FaultError{Kind: kind, Message: message}
 }
 
-// VersionEntry 是可用版本列表中的一项逻辑条目。
-type VersionEntry struct {
-	Version   string `json:"version"`
-	Active    bool   `json:"active"`
-	Installed bool   `json:"installed"`
+// 执行面哨兵错误：用于把"没装 PHP"和"指定版本没装"映射为不同协议错误码。
+var (
+	// ErrPHPNotInstalled 表示宿主一个 PHP 都没有。
+	ErrPHPNotInstalled = errors.New("未检测到 PHP")
+	// ErrVersionNotInstalled 表示请求的版本不在已安装列表内。
+	ErrVersionNotInstalled = errors.New("指定 PHP 版本未安装")
+)
+
+// CommandRunner 是外部命令执行面的最小契约：固定 argv、无 shell、带超时。
+type CommandRunner interface {
+	Run(name string, args ...string) (string, error)
 }
 
-// Executor 是 PHP 版本操作的执行面；骨架实现为 noop，测试可注入故障执行器。
-// 真实宿主 FPM 调用不在本仓实现，骨架口径下只返回逻辑结果。
+// Executor 是方法执行面：生产实现真实探测宿主；测试可注入故障执行器。
 type Executor interface {
-	Versions() ([]VersionEntry, error)
-	Use(version string) (bool, error)
+	Versions() (VersionsResult, error)
+	Info(version string) (InfoResult, error)
+	Projects(root string) (ProjectsResult, error)
+	Doctor(root string) (DoctorResult, error)
 }
 
-// versionsParams / useParams 是两个方法的显式入参形状。
-type versionsParams struct {
-	Detail bool `json:"detail"`
+// PHPVersion 是一个已安装的 PHP CLI 可执行文件。
+type PHPVersion struct {
+	Version         string `json:"version"`
+	Path            string `json:"path"`
+	Source          Source `json:"source"`
+	IsDefault       bool   `json:"is_default"`
+	SAPI            string `json:"sapi"`
+	ExtensionsCount int    `json:"extensions_count"`
 }
 
-type useParams struct {
+// VersionsResult 是 runtime-php.versions 的结构化结果。
+// 未检测到任何 PHP 时 versions 为空数组、count=0、hint 给出安装指引（不报错）。
+type VersionsResult struct {
+	Versions       []PHPVersion `json:"versions"`
+	DefaultVersion string       `json:"default_version"`
+	Count          int          `json:"count"`
+	Hint           string       `json:"hint,omitempty"`
+}
+
+// IniSettings 是本插件关心的四条 php.ini 关键配置（取自 `php -i` 的有效值）。
+type IniSettings struct {
+	MemoryLimit       string `json:"memory_limit"`
+	UploadMaxFilesize string `json:"upload_max_filesize"`
+	PostMaxSize       string `json:"post_max_size"`
+	MaxExecutionTime  string `json:"max_execution_time"`
+}
+
+// InfoResult 是 runtime-php.info 的结构化结果。
+// ini 未加载时 ini_path 为空串、ini_settings 取 php -i 的有效值（不放大为整次失败）。
+type InfoResult struct {
+	Version     string      `json:"version"`
+	PHPPath     string      `json:"php_path"`
+	IniPath     string      `json:"ini_path"`
+	Extensions  []string    `json:"extensions"`
+	IniSettings IniSettings `json:"ini_settings"`
+}
+
+// Project 是一个含 composer.json 的 PHP 项目条目。
+type Project struct {
+	Path              string `json:"path"`
+	Name              string `json:"name"`
+	PHPRequirement    string `json:"php_requirement"`
+	DependenciesCount int    `json:"dependencies_count"`
+	HasLock           bool   `json:"has_lock"`
+	Framework         string `json:"framework,omitempty"`
+}
+
+// ProjectsResult 是 runtime-php.projects 的结构化结果。
+// 单个 composer.json 超过上限/解析失败时跳过并写入 warnings，不中断整次扫描。
+type ProjectsResult struct {
+	Projects []Project `json:"projects"`
+	Count    int       `json:"count"`
+	Warnings []string  `json:"warnings"`
+}
+
+// Check 是一条健康检查。
+type Check struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
+	Detail string `json:"detail"`
+}
+
+// DoctorResult 是 runtime-php.doctor 的结构化结果：ok = 没有任何 fail 项。
+type DoctorResult struct {
+	OK     bool    `json:"ok"`
+	Checks []Check `json:"checks"`
+}
+
+// versionsParams / infoParams / projectsParams / doctorParams 是四个方法的显式入参形状。
+type versionsParams struct{}
+
+type infoParams struct {
 	Version string `json:"version"`
 }
 
-// VersionsResult / UseResult 是两个方法的结构化结果。
-type VersionsResult struct {
-	Versions []VersionEntry `json:"versions"`
-	Count    int            `json:"count"`
-	Current  string         `json:"current"`
+type projectsParams struct {
+	Root string `json:"root"`
 }
 
-type UseResult struct {
-	Version     string `json:"version"`
-	Applied     bool   `json:"applied"`
-	KoreManaged bool   `json:"kore_managed"`
+type doctorParams struct {
+	Root string `json:"root"`
+}
+
+// composerManifest 是 composer.json 中本插件关心的字段。
+// require 的键是动态包名，这里用 map[string]json.RawMessage 只做解析与取值（不引入 any）。
+type composerManifest struct {
+	Name    string                     `json:"name"`
+	Require map[string]json.RawMessage `json:"require"`
 }

@@ -1,7 +1,7 @@
-// Package main 是 kore 的 runtime-php 插件：PHP 运行时/版本切换的方法面骨架。
+// Package main 是 kore 的 runtime-php 插件：PHP CLI 运行时的检测与只读管理方法面。
 //
-// 本插件只做协议握手 + 参数校验 + 结构化结果，不真起 FPM 进程、
-// 不内置任何 php/fpm 二进制（裁决 37 / 提案 §2.1 批 2）。
+// runtime-php 做协议握手 + 真实探测宿主 PHP（PATH / phpenv / 常见路径）、单版本详情、
+// PHP 项目扫描与健康检查；不内置任何 php 二进制、不执行项目脚本、不写宿主文件。
 //
 // 协议面（kore.plugin.v1）：UDS → kore.hello 握手 → 会话循环读 request、
 // 按 method 分发并回 response；stdout 留给协议，日志一律写 stderr。

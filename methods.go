@@ -33,7 +33,7 @@ func dispatch(request *pluginapi.Request, cfg config, logger *slog.Logger) (*plu
 		response.Result = json.RawMessage(`{"ok":true,"config_digest":""}`)
 		return response, false
 	}
-	result, perr := phpop.Call(request.Method, request.Params, nil)
+	result, perr := phpop.Call(request.Method, request.Params, cfg.root, nil)
 	if perr != nil {
 		response.Error = perr
 		response.Result = nil

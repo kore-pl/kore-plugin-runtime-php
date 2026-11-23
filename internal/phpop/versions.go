@@ -6,54 +6,24 @@ import (
 	"github.com/pengtang1024/kore/pkg/pluginapi"
 )
 
-// callVersions 处理 runtime-php.versions：校验 params 后返回逻辑版本列表（骨架口径不探测宿主）。
-func callVersions(raw json.RawMessage, exec Executor) (json.RawMessage, *pluginapi.Error) {
+// callVersions 处理 runtime-php.versions：无参数，返回宿主全部已安装 PHP。
+// 未检测到任何 PHP 时不报错，返回空数组 + count=0 + hint。
+func callVersions(params json.RawMessage, exec Executor) (json.RawMessage, *pluginapi.Error) {
 	var p versionsParams
-	if perr := decodeParams(raw, &p); perr != nil {
-		return nil, perr
+	if err := strictUnmarshal(params, &p); err != nil {
+		return nil, invalid("runtime-php.versions 参数非法: " + err.Error())
 	}
-	entries, err := exec.Versions()
+	result, err := exec.Versions()
 	if err != nil {
 		return nil, classify(err)
 	}
-	if entries == nil {
-		entries = []VersionEntry{}
+	if result.Versions == nil {
+		result.Versions = []PHPVersion{}
 	}
-	return encode(VersionsResult{Versions: entries, Count: len(entries), Current: defaultVersion})
-}
-
-// noopExecutor 是骨架默认执行面：不真起 FPM、不探测宿主，只返回逻辑版本列表。
-type noopExecutor struct{}
-
-func (noopExecutor) Versions() ([]VersionEntry, error) {
-	out := make([]VersionEntry, 0, len(allowedVersions))
-	for _, v := range allowedVersions {
-		out = append(out, VersionEntry{Version: v, Active: v == defaultVersion, Installed: true})
+	result.Count = len(result.Versions)
+	if result.Count == 0 {
+		result.DefaultVersion = ""
+		result.Hint = NoPHPHint
 	}
-	return out, nil
-}
-
-func (noopExecutor) Use(version string) (bool, error) { return false, nil }
-
-// decodeParams 校验 params 是 JSON 对象并反序列化到目标形状。
-func decodeParams(raw json.RawMessage, target any) *pluginapi.Error {
-	if len(raw) == 0 || string(raw) == "null" {
-		return invalid("缺少必填参数对象")
-	}
-	if raw[0] != '{' {
-		return invalid("params 必须是 JSON 对象")
-	}
-	if err := json.Unmarshal(raw, target); err != nil {
-		return invalid("params 解析失败: " + err.Error())
-	}
-	return nil
-}
-
-// encode 把结果编码为 json.RawMessage；序列化失败归 E_INTERNAL。
-func encode(v any) (json.RawMessage, *pluginapi.Error) {
-	data, err := json.Marshal(v)
-	if err != nil {
-		return nil, internalErr("序列化结果失败: " + err.Error())
-	}
-	return data, nil
+	return marshal(result)
 }
