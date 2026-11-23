@@ -1,17 +1,24 @@
 {
   "id": "runtime-php",
   "name": "PHP 运行时插件",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "protocol": "kore.plugin.v1",
   "lifecycle": "lazy",
   "depth_level": "production",
   "entry": "bin/runtime-php",
   "capabilities": ["system:admin"],
+  "method_capabilities": {
+    "runtime-php.versions": "system:read",
+    "runtime-php.info": "system:read",
+    "runtime-php.projects": "system:read",
+    "runtime-php.doctor": "system:read",
+    "runtime-php.paths": "system:read"
+  },
   "triggers": [],
   "requires_kore": ">=0.1.0 <0.2.0",
   "resources": {"memory_mb": 6, "cpu_quota": "15%", "pids_max": 24},
   "depends_on": [],
   "conflicts": [],
   "scenario_tags": ["web", "app"],
-  "size_bytes": 1399447
+  "size_bytes": 1404484
 }

@@ -32,6 +32,10 @@ func (f faultExecutor) Doctor(string) (phpop.DoctorResult, error) {
 	return phpop.DoctorResult{}, phpop.NewFaultError(f.kind, "doctor 执行面故障")
 }
 
+func (f faultExecutor) Paths() (phpop.PathsResult, error) {
+	return phpop.PathsResult{}, phpop.NewFaultError(f.kind, "paths 执行面故障")
+}
+
 // methodCase 是一个待注入故障的方法及其合法参数（root 由 testRoot 动态生成）。
 type methodCase struct {
 	name   string
@@ -39,7 +43,7 @@ type methodCase struct {
 	params func(root string) string
 }
 
-// methods 覆盖四个方法；root 使用状态目录白名单（t.TempDir 作为 <state>）。
+// methods 覆盖五个方法；root 使用状态目录白名单（t.TempDir 作为 <state>）。
 var methods = []methodCase{
 	{"versions", "runtime-php.versions", func(string) string { return `{}` }},
 	{"info", "runtime-php.info", func(string) string { return `{}` }},
@@ -49,6 +53,7 @@ var methods = []methodCase{
 	{"doctor", "runtime-php.doctor", func(root string) string {
 		return `{"root":` + jsonString(root) + `}`
 	}},
+	{"paths", "runtime-php.paths", func(string) string { return `{}` }},
 }
 
 // assertFault 对每个方法注入故障，断言返回 nil 结果 + 预期协议错误码与类别关键词。
@@ -95,7 +100,16 @@ func (okExecutor) Doctor(string) (phpop.DoctorResult, error) {
 	return phpop.DoctorResult{Checks: []phpop.Check{{Name: "php", Status: phpop.StatusPass, Detail: "ok"}}}, nil
 }
 
-// sanityNoFault 验证无故障时四方法正常返回，证明故障断言不是"永远失败"的假通过。
+func (okExecutor) Paths() (phpop.PathsResult, error) {
+	return phpop.PathsResult{
+		PathEnv:     []string{"/usr/bin"},
+		Executables: []phpop.PathExecutable{{Name: "php", Path: "/usr/bin/php", Found: true}},
+		Default:     phpop.DefaultRuntime{Command: "php", Found: true},
+		SearchOrder: []phpop.SearchSource{{Source: phpop.SourcePath, Paths: []string{"/usr/bin/php"}}},
+	}, nil
+}
+
+// sanityNoFault 验证无故障时五方法正常返回，证明故障断言不是"永远失败"的假通过。
 func sanityNoFault(t *testing.T) {
 	t.Helper()
 	root := t.TempDir()

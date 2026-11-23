@@ -5,8 +5,9 @@ PHP 运行时插件（**生产级**）：真实检测宿主已安装的 PHP CLI�
 
 ## 协议面
 
-- `kore.plugin.v1`，`lifecycle=lazy`，`depth_level=production`，能力声明 `system:admin`
-- 方法：`runtime-php.versions` / `runtime-php.info` / `runtime-php.projects` / `runtime-php.doctor`
+- `kore.plugin.v1`，`lifecycle=lazy`，`depth_level=production`，插件级能力 `system:admin`（仅作未声明方法的 fail-closed 回退）
+- **方法级能力**（`method_capabilities`）：5 个方法全为 `system:read`——只读探测无需管理权限，内核据此不再把只读调用计入写审计
+- 方法：`runtime-php.versions` / `runtime-php.info` / `runtime-php.projects` / `runtime-php.doctor` / `runtime-php.paths`
   （域必须等于插件 id `runtime-php`，PLUGIN-PROTOCOL §7.2；不接受裸动词或旧 `php.` 前缀）
 - 握手的 stdout 留给协议帧，日志一律写 stderr；未知方法 `E_NOTFOUND`，参数非法 `E_INVALID`
 - 运行期配置：`KORE_PHP_ROOT`（插件状态目录，默认 `/var/lib/kore/php`，同时是 root 白名单的一项）
@@ -23,7 +24,9 @@ PHP 运行时插件（**生产级**）：真实检测宿主已安装的 PHP CLI�
 ```json
 {
   "versions": [
-    {"version": "8.5.4", "path": "/usr/bin/php8.5", "source": "path", "is_default": true, "sapi": "cli", "extensions_count": 19}
+    {"version": "8.5.4", "path": "/usr/bin/php8.5", "source": "path", "is_default": true,
+     "sapi": "cli", "extensions_count": 19, "bin_dir": "/usr/bin",
+     "package_manager": "composer", "package_manager_path": "/usr/local/bin/composer"}
   ],
   "default_version": "8.5.4",
   "count": 1
@@ -31,6 +34,8 @@ PHP 运行时插件（**生产级**）：真实检测宿主已安装的 PHP CLI�
 ```
 
 - `source` ∈ `path` / `known_path` / `phpenv`；`sapi` 固定 `cli`（本插件只管理 CLI，不管理 FPM 进程）
+- `bin_dir` 是安装目录；`package_manager` 固定 `composer`；`package_manager_path` 优先同目录 `composer`、其次 PATH 上的
+  `composer`（**只做文件查找，不执行命令**，不会为每个版本额外拉起进程）
 - **未检测到 PHP 不报错**：`versions=[]`、`count=0`、`default_version=""`，并给固定 `hint`：
   `未检测到 PHP，可执行 apt install php-cli，或用 phpenv / 官方包安装后把 php 放进 PATH`
 - glob 展开结果按 basename 过滤（只接受 `php` / `php8.5` 这类名字），`phpize` / `php-config` / `phpdbg` 不会被误当解释器
@@ -107,6 +112,32 @@ PHP 运行时插件（**生产级**）：真实检测宿主已安装的 PHP CLI�
 - 检出多版本时追加 `path_conflict` warn（同一台机器多版本共存要固定路径）
 - 给出 `root` 时追加 `project_root` 检查（发现 0 个项目为 warn，不误判为 fail）
 
+### `runtime-php.paths`（无参数）
+
+解释「**为什么用到了这个版本**」：PATH 原始顺序、候选可执行名解析结果、默认 PHP 的解析链，
+以及按探测优先级排列的发现来源。只读：复用 `versions` 的同一套候选收集逻辑与一次 `-v`，不写宿主。
+
+```json
+{
+  "path_env": ["/usr/local/sbin", "/usr/local/bin", "/usr/bin"],
+  "executables": [{"name": "php", "path": "/usr/local/bin/php", "found": true}],
+  "default": {
+    "command": "php", "path": "/usr/local/bin/php", "real_path": "/usr/bin/php8.5",
+    "version": "8.5.4", "bin_dir": "/usr/local/bin",
+    "package_manager": "composer", "package_manager_path": "/usr/local/bin/composer",
+    "found": true
+  },
+  "search_order": [
+    {"source": "path", "paths": ["/usr/local/bin/php"]},
+    {"source": "phpenv", "paths": ["/root/.phpenv/versions/8.1.0/bin/php"]},
+    {"source": "known_path", "paths": ["/usr/bin/php8.5"]}
+  ]
+}
+```
+
+- `search_order` 的条目顺序 = 实际探测优先级（PATH → phpenv → 常见路径），只列**命中的**来源；重复路径按真实文件去重
+- 未检测到 PHP 时不报错：`default.found=false`、`search_order=[]`，并给与 `versions` 相同的 `hint`
+
 ## 安全模型
 
 - **root 白名单**：`/var/www`、`/opt`、`/home` + 插件状态目录（`KORE_PHP_ROOT`，默认 `/var/lib/kore/php`）
@@ -122,7 +153,7 @@ PHP 运行时插件（**生产级**）：真实检测宿主已安装的 PHP CLI�
 ```bash
 gofmt -l . && GOWORK=off go vet ./... && GOWORK=off go test -timeout 200s ./...
 make build && make dist
-tar -tzf dist/runtime-php-0.2.0.tar.gz | head -1   # info.json
+tar -tzf dist/runtime-php-0.2.1.tar.gz | head -1   # info.json
 ```
 
 `dist` 使用确定性参数归档（`--sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner` + `gzip -9n`、逐条目 chmod 归一），

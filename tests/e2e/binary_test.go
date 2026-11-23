@@ -93,6 +93,36 @@ func TestBinaryNoPHPDegraded(t *testing.T) {
 	}
 	t.Logf("二进制降级 versions => %s", versions)
 
+	// paths 在无 PHP 时同样不报错：default.found=false + hint，PATH 与候选名如实回显。
+	paths := callBinary(t, conn, "runtime-php.paths", `{}`)
+	var pathsResult struct {
+		PathEnv     []string `json:"path_env"`
+		Executables []struct {
+			Name  string `json:"name"`
+			Found bool   `json:"found"`
+		} `json:"executables"`
+		Default struct {
+			Found bool `json:"found"`
+		} `json:"default"`
+		Hint string `json:"hint"`
+	}
+	if err := json.Unmarshal(paths, &pathsResult); err != nil {
+		t.Fatalf("解析 paths 结果失败: %v（%s）", err, paths)
+	}
+	if pathsResult.Default.Found {
+		t.Fatalf("空环境不应解析出默认 PHP: %s", paths)
+	}
+	if pathsResult.Hint != phpop.NoPHPHint {
+		t.Fatalf("paths hint=%q，期望 %q", pathsResult.Hint, phpop.NoPHPHint)
+	}
+	if len(pathsResult.PathEnv) != 1 || pathsResult.PathEnv[0] != "/nonexistent-kore-test-path" {
+		t.Fatalf("path_env 未如实回显: %s", paths)
+	}
+	if len(pathsResult.Executables) != 1 || pathsResult.Executables[0].Found {
+		t.Fatalf("executables 应只有 php 且未找到: %s", paths)
+	}
+	t.Logf("二进制降级 paths => %s", paths)
+
 	// info 在无 PHP 时按 E_NOTFOUND 降级，而不是进程崩溃或空结果。
 	infoReq := &pluginapi.Request{
 		Type: pluginapi.TypeRequest, ID: randomID(t), ReqID: "r-info",

@@ -32,10 +32,11 @@ func (f *fakeRunner) Run(name string, args ...string) (string, error) {
 
 // phpFixture 是一套临时目录里的假 PHP 安装：PATH 软链 + phpenv + /usr/bin 两份。
 type phpFixture struct {
-	root   string
-	path   string
-	phpenv string
-	usrdir string
+	root     string
+	path     string
+	phpenv   string
+	usrdir   string
+	composer string
 }
 
 // newPHPFixture 建目录与可执行文件（内容为空，只需通过 resolveCandidate 的存在性检查）。
@@ -52,11 +53,13 @@ func newPHPFixture(t *testing.T) phpFixture {
 		}
 	}
 	fixture := phpFixture{
-		root:   root,
-		path:   filepath.Join(root, "bin", "php"),
-		phpenv: filepath.Join(root, ".phpenv", "versions", "8.1.0", "bin", "php"),
-		usrdir: filepath.Join(root, "usr", "bin"),
+		root:     root,
+		path:     filepath.Join(root, "bin", "php"),
+		phpenv:   filepath.Join(root, ".phpenv", "versions", "8.1.0", "bin", "php"),
+		usrdir:   filepath.Join(root, "usr", "bin"),
+		composer: filepath.Join(root, "bin", "composer"),
 	}
+	makeBinary(fixture.composer)
 	makeBinary(filepath.Join(root, "real-php-8.3.6"))
 	makeBinary(fixture.phpenv)
 	makeBinary(filepath.Join(fixture.usrdir, "php8.2.1"))
@@ -79,13 +82,17 @@ func newFixtureRuntime(fixture phpFixture, runner *fakeRunner) *Runtime {
 	return &Runtime{
 		runner: runner,
 		lookPath: func(name string) (string, error) {
-			if name == "php" {
+			switch name {
+			case "php":
 				return fixture.path, nil
+			case "composer":
+				return fixture.composer, nil
 			}
 			return "", errors.New("not found")
 		},
 		homeDir:    func() (string, error) { return fixture.root, nil },
 		glob:       filepath.Glob,
+		getenv:     func(string) string { return "/usr/local/bin:/usr/bin" },
 		knownGlobs: []string{filepath.Join(fixture.usrdir, "php*")},
 	}
 }
@@ -406,5 +413,95 @@ func TestRunnerTruncatesHugeOutput(t *testing.T) {
 	}
 	if len(out) > MaxCommandOutputBytes {
 		t.Fatalf("捕获 %d 字节，超过上限 %d", len(out), MaxCommandOutputBytes)
+	}
+}
+
+// TestDetectInstallMetadata versions 增强字段：安装目录、包管理器与包管理器路径。
+func TestDetectInstallMetadata(t *testing.T) {
+	fixture := newPHPFixture(t)
+	runtime := newFixtureRuntime(fixture, fixtureRunner(fixture))
+	result, err := runtime.Versions()
+	if err != nil {
+		t.Fatalf("Versions 失败: %v", err)
+	}
+	if result.Count != 3 {
+		t.Fatalf("期望 3 个版本，实际 %+v", result.Versions)
+	}
+	for _, item := range result.Versions {
+		if item.BinDir != filepath.Dir(item.Path) {
+			t.Fatalf("%s 的 bin_dir=%q，期望 %q", item.Version, item.BinDir, filepath.Dir(item.Path))
+		}
+		if item.PackageManager != PackageManager {
+			t.Fatalf("%s 的 package_manager=%q，期望 %q", item.Version, item.PackageManager, PackageManager)
+		}
+		if item.PackageManagerPath != fixture.composer {
+			t.Fatalf("%s 的 package_manager_path=%q，期望 %q（同目录或 PATH 回退）",
+				item.Version, item.PackageManagerPath, fixture.composer)
+		}
+	}
+}
+
+// TestPathsReportsSearchOrderAndDefault paths：PATH 顺序、可执行名解析、默认解析链与来源顺序。
+func TestPathsReportsSearchOrderAndDefault(t *testing.T) {
+	fixture := newPHPFixture(t)
+	runtime := newFixtureRuntime(fixture, fixtureRunner(fixture))
+	result, err := runtime.Paths()
+	if err != nil {
+		t.Fatalf("Paths 失败: %v", err)
+	}
+	if len(result.PathEnv) != 2 || result.PathEnv[0] != "/usr/local/bin" || result.PathEnv[1] != "/usr/bin" {
+		t.Fatalf("path_env=%v", result.PathEnv)
+	}
+	if len(result.Executables) != 1 || !result.Executables[0].Found || result.Executables[0].Path != fixture.path {
+		t.Fatalf("executables=%+v", result.Executables)
+	}
+	if !result.Default.Found || result.Default.Command != "php" || result.Default.Path != fixture.path {
+		t.Fatalf("default=%+v", result.Default)
+	}
+	if result.Default.Version != "8.3.6" {
+		t.Fatalf("default.version=%q，期望 8.3.6", result.Default.Version)
+	}
+	if result.Default.PackageManagerPath != fixture.composer {
+		t.Fatalf("default.package_manager_path=%q", result.Default.PackageManagerPath)
+	}
+	if len(result.SearchOrder) != 3 {
+		t.Fatalf("search_order=%+v，期望 path/phpenv/known_path 三条", result.SearchOrder)
+	}
+	if result.SearchOrder[0].Source != SourcePath || result.SearchOrder[0].Paths[0] != fixture.path {
+		t.Fatalf("第一条来源异常: %+v", result.SearchOrder[0])
+	}
+	// 一致性地基：candidates() 的每条路径都必须出现在 search_order 里。
+	listed := map[string]bool{}
+	for _, source := range result.SearchOrder {
+		for _, path := range source.Paths {
+			listed[path] = true
+		}
+	}
+	for _, item := range runtime.candidates() {
+		if !listed[item.path] {
+			t.Fatalf("候选 %s（source=%s）未出现在 search_order", item.path, item.source)
+		}
+	}
+}
+
+// TestPathsWithoutPHP 未安装 PHP 时 paths 不报错：default.found=false + hint。
+func TestPathsWithoutPHP(t *testing.T) {
+	runtime := &Runtime{
+		runner:     &fakeRunner{outputs: map[string]string{}, errs: map[string]error{}},
+		lookPath:   func(string) (string, error) { return "", errors.New("not found") },
+		homeDir:    func() (string, error) { return "", errors.New("no home") },
+		glob:       func(string) ([]string, error) { return nil, nil },
+		getenv:     func(string) string { return "" },
+		knownGlobs: nil,
+	}
+	result, err := runtime.Paths()
+	if err != nil {
+		t.Fatalf("Paths 失败: %v", err)
+	}
+	if result.Default.Found || result.Hint != NoPHPHint {
+		t.Fatalf("未安装时结果异常: %+v", result)
+	}
+	if len(result.PathEnv) != 0 || len(result.SearchOrder) != 0 {
+		t.Fatalf("空环境结果异常: %+v", result)
 	}
 }

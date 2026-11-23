@@ -29,7 +29,15 @@ const (
 	NoPHPHint = "未检测到 PHP，可执行 apt install php-cli，或用 phpenv / 官方包安装后把 php 放进 PATH"
 	// SAPI 是本插件探测的接口类型：只管理 CLI，不管理 FPM 进程。
 	SAPI = "cli"
+	// PackageManager 是本插件关联的包管理器名（versions[].package_manager 的固定取值）。
+	PackageManager = "composer"
 )
+
+// runtimeBinaryNames 是 PATH 解析与 paths 方法共用的候选可执行文件名（按优先级）。
+var runtimeBinaryNames = []string{"php"}
+
+// packageManagerNames 是包管理器可执行文件名（同目录优先，其次 PATH）。
+var packageManagerNames = []string{"composer"}
 
 // Source 标识一个 PHP 可执行文件的发现渠道。
 type Source string
@@ -94,16 +102,22 @@ type Executor interface {
 	Info(version string) (InfoResult, error)
 	Projects(root string) (ProjectsResult, error)
 	Doctor(root string) (DoctorResult, error)
+	Paths() (PathsResult, error)
 }
 
 // PHPVersion 是一个已安装的 PHP CLI 可执行文件。
+// bin_dir 是安装目录（path 的父目录），package_manager 固定为 composer，
+// package_manager_path 优先取同目录 composer、其次 PATH 上的 composer（只查找，不执行命令）。
 type PHPVersion struct {
-	Version         string `json:"version"`
-	Path            string `json:"path"`
-	Source          Source `json:"source"`
-	IsDefault       bool   `json:"is_default"`
-	SAPI            string `json:"sapi"`
-	ExtensionsCount int    `json:"extensions_count"`
+	Version            string `json:"version"`
+	Path               string `json:"path"`
+	Source             Source `json:"source"`
+	IsDefault          bool   `json:"is_default"`
+	SAPI               string `json:"sapi"`
+	ExtensionsCount    int    `json:"extensions_count"`
+	BinDir             string `json:"bin_dir"`
+	PackageManager     string `json:"package_manager"`
+	PackageManagerPath string `json:"package_manager_path"`
 }
 
 // VersionsResult 是 runtime-php.versions 的结构化结果。
@@ -164,8 +178,44 @@ type DoctorResult struct {
 	Checks []Check `json:"checks"`
 }
 
-// versionsParams / infoParams / projectsParams / doctorParams 是四个方法的显式入参形状。
+// PathExecutable 是 PATH 上某个候选可执行名的解析结果。
+type PathExecutable struct {
+	Name  string `json:"name"`
+	Path  string `json:"path"`
+	Found bool   `json:"found"`
+}
+
+// DefaultRuntime 是「当前默认 PHP 是哪个、怎么解析出来的」。
+type DefaultRuntime struct {
+	Command            string `json:"command"`
+	Path               string `json:"path"`
+	RealPath           string `json:"real_path"`
+	Version            string `json:"version"`
+	BinDir             string `json:"bin_dir"`
+	PackageManager     string `json:"package_manager"`
+	PackageManagerPath string `json:"package_manager_path"`
+	Found              bool   `json:"found"`
+}
+
+// SearchSource 是一条发现来源及其命中路径（顺序与探测优先级一致）。
+type SearchSource struct {
+	Source Source   `json:"source"`
+	Paths  []string `json:"paths"`
+}
+
+// PathsResult 是 runtime-php.paths 的结构化结果：解释「为什么用到了这个版本」。
+type PathsResult struct {
+	PathEnv     []string         `json:"path_env"`
+	Executables []PathExecutable `json:"executables"`
+	Default     DefaultRuntime   `json:"default"`
+	SearchOrder []SearchSource   `json:"search_order"`
+	Hint        string           `json:"hint,omitempty"`
+}
+
+// versionsParams / infoParams / projectsParams / doctorParams / pathsParams 是显式入参形状。
 type versionsParams struct{}
+
+type pathsParams struct{}
 
 type infoParams struct {
 	Version string `json:"version"`

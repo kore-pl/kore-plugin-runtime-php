@@ -369,6 +369,16 @@ func (emptyExecutor) Doctor(string) (phpop.DoctorResult, error) {
 	return phpop.DoctorResult{Checks: []phpop.Check{{Name: "php", Status: phpop.StatusFail, Detail: phpop.NoPHPHint}}}, nil
 }
 
+func (emptyExecutor) Paths() (phpop.PathsResult, error) {
+	return phpop.PathsResult{
+		PathEnv:     []string{"/usr/bin"},
+		Executables: []phpop.PathExecutable{{Name: "php"}},
+		Default:     phpop.DefaultRuntime{Command: "php"},
+		SearchOrder: []phpop.SearchSource{},
+		Hint:        phpop.NoPHPHint,
+	}, nil
+}
+
 // sameFile 判定两个路径是否指向同一文件（跟随符号链接）。
 func sameFile(left, right string) error {
 	leftReal, err := filepath.EvalSymlinks(left)

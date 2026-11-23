@@ -15,6 +15,7 @@ type stubExecutor struct {
 	info     InfoResult
 	projects ProjectsResult
 	doctor   DoctorResult
+	paths    PathsResult
 	err      error
 }
 
@@ -24,14 +25,16 @@ func (s stubExecutor) Projects(string) (ProjectsResult, error) {
 	return s.projects, s.err
 }
 func (s stubExecutor) Doctor(string) (DoctorResult, error) { return s.doctor, s.err }
+func (s stubExecutor) Paths() (PathsResult, error)         { return s.paths, s.err }
 
-// TestBusinessVerb 方法名归一化：只接受 runtime-php.<四个动词>。
+// TestBusinessVerb 方法名归一化：只接受 runtime-php.<五个动词>（含 paths）。
 func TestBusinessVerb(t *testing.T) {
 	cases := map[string]string{
 		"runtime-php.versions": "versions",
 		"runtime-php.info":     "info",
 		"runtime-php.projects": "projects",
 		"runtime-php.doctor":   "doctor",
+		"runtime-php.paths":    "paths",
 	}
 	for method, want := range cases {
 		got, ok := businessVerb(method)
@@ -215,4 +218,37 @@ func jsonString(value string) string {
 		return `""`
 	}
 	return string(encoded)
+}
+
+// TestCallPathsNormalizes 空结果归一：数组字段不为 null，未找到默认 PHP 时补 hint。
+func TestCallPathsNormalizes(t *testing.T) {
+	raw, perr := Call("runtime-php.paths", json.RawMessage(`{}`), "", stubExecutor{})
+	if perr != nil {
+		t.Fatalf("paths 意外错误: %v", perr)
+	}
+	text := string(raw)
+	for _, want := range []string{`"path_env":[]`, `"executables":[]`, `"search_order":[]`, `"hint":"`} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("结果=%s，缺少 %q", text, want)
+		}
+	}
+}
+
+// TestCallPathsRejectsBadParams 参数必须是 JSON 对象、拒绝未知字段。
+func TestCallPathsRejectsBadParams(t *testing.T) {
+	for _, params := range []string{`[]`, `null`, ``, `{"verbose":true}`} {
+		_, perr := Call("runtime-php.paths", json.RawMessage(params), "", stubExecutor{})
+		if perr == nil || perr.Code != pluginapi.E_INVALID {
+			t.Fatalf("params=%q 错误=%v，期望 E_INVALID", params, perr)
+		}
+	}
+}
+
+// TestCallPathsPropagatesFault 执行面故障映射为协议错误码（paths 与其余方法同一口径）。
+func TestCallPathsPropagatesFault(t *testing.T) {
+	exec := stubExecutor{err: NewFaultError(FaultTimeout, "paths 超时")}
+	_, perr := Call("runtime-php.paths", json.RawMessage(`{}`), "", exec)
+	if perr == nil || perr.Code != pluginapi.E_UPSTREAM {
+		t.Fatalf("错误=%v，期望 E_UPSTREAM", perr)
+	}
 }
