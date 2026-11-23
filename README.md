@@ -176,3 +176,22 @@ tar -tzf dist/runtime-php-0.2.1.tar.gz | head -1   # info.json
 - 不真起 / 不管理 PHP-FPM 进程池、不切 `/etc/alternatives/php`、不改站点配置（`use` 方法在 0.2.0 移除）
 - 不内置 php 二进制；宿主没装 PHP 时 `versions` 给安装指引而不是报错
 - 不解析 `composer.lock` 依赖树、不执行 `composer install`
+
+<!-- oss:begin -->
+## 开源与贡献
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Go 1.26](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](go.mod)
+
+本仓库是 **kore** 的 `PHP 运行时插件`（id `runtime-php`），独立仓库、独立版本线。内核与协议见 [kore](https://github.com/kore-pl/kore)。
+
+- **许可**：MIT（inbound = outbound，不要求 CLA）；提交用 `git commit -s` 签 DCO。
+- **贡献**：[CONTRIBUTING.md](CONTRIBUTING.md)（构建、门禁、发版、边界）。
+- **安全**：[SECURITY.md](SECURITY.md)——漏洞不要开公开 issue。
+- **行为准则**：[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)。
+- **兼容性**：`protocol: kore.plugin.v1` · `requires_kore: >=0.1.0 <0.2.0` · `lifecycle: lazy` · 深度等级 `production`。
+- **验证方式**：本地 `make check`（插件仓不配 CI；发布前 `make dist` 连跑两次核对 sha 一致）。
+- **发布产物**：`make dist` → `dist/runtime-php-0.2.2.tar.gz` + `.sha256`（位级可复现，连跑两次 sha 相同）。
+- **相关仓库**：[索引 kore-plugins](https://github.com/kore-pl/kore-plugins) · [协议文档](https://github.com/kore-pl/kore/blob/main/docs/PLUGIN-PROTOCOL.md) · [SDK 指南](https://github.com/kore-pl/kore/blob/main/docs/PLUGIN-SDK.md)
+
+<!-- oss:end -->
