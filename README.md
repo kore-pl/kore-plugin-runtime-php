@@ -153,7 +153,7 @@ PHP 运行时插件（**生产级**）：真实检测宿主已安装的 PHP CLI�
 ```bash
 gofmt -l . && GOWORK=off go vet ./... && GOWORK=off go test -timeout 200s ./...
 make build && make dist
-tar -tzf dist/runtime-php-0.2.1.tar.gz | head -1   # info.json
+tar -tzf dist/runtime-php-0.2.2.tar.gz | head -1   # info.json
 ```
 
 `dist` 使用确定性参数归档（`--sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner` + `gzip -9n`、逐条目 chmod 归一），
