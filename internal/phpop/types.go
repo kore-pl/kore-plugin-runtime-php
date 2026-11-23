@@ -31,6 +31,8 @@ const (
 	SAPI = "cli"
 	// PackageManager 是本插件关联的包管理器名（versions[].package_manager 的固定取值）。
 	PackageManager = "composer"
+	// PathDefaultHint 是「装了 PHP 但 PATH 上没有 php」时的默认版本解析提示。
+	PathDefaultHint = "PATH 上未找到 php；已安装的 PHP 仍在 versions 列表中，但无法确定默认版本，请检查 PATH"
 )
 
 // runtimeBinaryNames 是 PATH 解析与 paths 方法共用的候选可执行文件名（按优先级）。

@@ -302,10 +302,13 @@ func (r *Runtime) Paths() (PathsResult, error) {
 		result.Executables = append(result.Executables, entry)
 	}
 	result.Default = r.defaultRuntime()
+	result.SearchOrder = r.searchOrder()
 	if !result.Default.Found {
 		result.Hint = NoPHPHint
+		if len(result.SearchOrder) > 0 {
+			result.Hint = PathDefaultHint
+		}
 	}
-	result.SearchOrder = r.searchOrder()
 	return result, nil
 }
 

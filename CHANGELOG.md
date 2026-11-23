@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.2 (2026-11-23)
+
+- fix: `runtime-php.paths` 的 `hint` 语义（原 0.2.1 已发布，按「改 dist sha 必须 bump」升 patch）——
+  装了 PHP 但 PATH 上没有 `php` 时不再误报「未检测到 PHP」，改为说明「已安装的 PHP 仍在 versions 列表中，
+  但无法确定默认版本，请检查 PATH」；确实一个都没装才给安装提示
+- test: 空 PATH 二进制降级用例断言由「恒为安装提示」改为按「有无安装」区分两种 hint；单测覆盖两条路径
+- docs: README 修正 `search_order` 的去重口径（同一路径只列一次，软链按来源保留）
+
+
 ## 0.2.1 (2026-11-23)
 
 - feat: 方法级能力声明（§3.5 #12）——`runtime-php.versions` / `info` / `projects` / `doctor` / `paths` 全部 `system:read`，
