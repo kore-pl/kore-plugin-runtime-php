@@ -68,9 +68,16 @@ func TestResourceExhaustionCommandOutputFlood(t *testing.T) {
 	}
 }
 
-// TestResourceExhaustionLowFileDescriptors 资源耗尽（真实注入）：用 bash ulimit -n 8 重跑本测试
-// 二进制，在真实 fd 枯竭下并发调用 versions。插件必须把 exec 失败当候选失败跳过，
-// 按降级契约返回合法 JSON（不 panic、不挂起、不把 fd 错误放大成协议错误）。
+// TestResourceExhaustionLowFileDescriptors 资源耗尽（真实注入）：重跑本测试二进制，
+// 由 helper 以「自身已开 fd 数」为基线把 RLIMIT_NOFILE 收紧到 +1，在真实 fd 枯竭下
+// 并发调用 versions。插件必须把 exec 失败当候选失败跳过，按降级契约返回合法 JSON
+// （不 panic、不挂起、不把 fd 错误放大成协议错误）。
+//
+// 不复用 `bash -c 'ulimit -n 8'`：绝对预算在 `-race` 下是错的。race 运行时与
+// netpoll 自身还要占 fd，8 个预算被继承 fd 吃完后连 Go 运行时的 eventfd 都创建不
+// 出来 → `fatal error: runtime: eventfd failed`（栈在 runtime.netpollinit，不是被测
+// 代码），2026-11-24 `make check` 第 18 段即因此变红。预算改为相对值后与宿主继承
+// 多少 fd、Go 版本、是否 -race 全部无关。
 func TestResourceExhaustionLowFileDescriptors(t *testing.T) {
 	if os.Getenv(lowFDHelperEnv) != "" {
 		t.Skip("helper 只由父用例启动")
@@ -83,33 +90,83 @@ func TestResourceExhaustionLowFileDescriptors(t *testing.T) {
 	writeFakePHP(t, fakeDir, 0)
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "bash", "-c",
-		`ulimit -n 8; exec "$0" -test.run '^TestResourceLowFDHelper$' -test.v`, exe)
+	cmd := exec.CommandContext(ctx, exe, "-test.run", "^TestResourceLowFDHelper$", "-test.v")
 	cmd.Env = append(os.Environ(),
 		lowFDHelperEnv+"=1",
 		"PATH="+fakeDir+string(os.PathListSeparator)+os.Getenv("PATH"),
 	)
 	out, runErr := cmd.CombinedOutput()
 	if runErr != nil {
-		t.Fatalf("ulimit -n 8 下 helper 未优雅退出: %v\n%s", runErr, out)
+		t.Fatalf("fd 枯竭下 helper 未优雅退出: %v\n%s", runErr, out)
 	}
 	if !strings.Contains(string(out), "BOUNDARY-LOW-FD-OK") {
-		t.Fatalf("ulimit -n 8 下缺少降级完成标记:\n%s", out)
+		t.Fatalf("fd 枯竭下缺少降级完成标记:\n%s", out)
 	}
 }
 
-// TestResourceLowFDHelper 只在 RLIMIT_NOFILE=8 的子进程里执行：断言真实 fd 枯竭下
-// 并发 versions 调用全部按契约返回（perr=nil + 合法 JSON 版本列表）。
+// TestResourceLowFDHelper 只在父用例拉起的子进程里执行：先初始化 netpoll（否则收紧
+// 预算后 eventfd 创建失败会变成 runtime fatal，那是预算问题不是被测代码问题），
+// 再把软限收到「当前占用 + headroom」并**显式 open 到 EMFILE**，最后放回 1 个空位，
+// 断言真实 fd 枯竭下并发 versions 调用全部按契约返回（perr=nil + 合法 JSON 版本列表）。
 func TestResourceLowFDHelper(t *testing.T) {
 	if os.Getenv(lowFDHelperEnv) != "1" {
-		t.Skip("父用例通过 ulimit -n 重入执行")
+		t.Skip("父用例拉起的 helper 才执行")
 	}
+	// 强制 netpoll 初始化：pipe fd 可 poll，会创建 eventfd/epoll。必须在收紧预算之前
+	// 完成，否则 -race 下 eventfd 拿不到 fd → runtime fatal（即 2026-11-24 第 18 段
+	// 那次「失败」的真身，不是被测代码的竞争）。
+	pr, pw, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("创建 pipe 触发 netpoll 初始化失败: %v", err)
+	}
+	_ = pr.Close()
+	_ = pw.Close()
+	var orig syscall.Rlimit
+	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &orig); err != nil {
+		t.Fatalf("读取 RLIMIT_NOFILE 失败: %v", err)
+	}
+	// 不写死绝对预算（旧版 `ulimit -n 8` 的坑）：预算一律相对自身已开 fd，
+	// 与宿主继承了多少 fd、Go/race 运行时占几个 fd 无关。
+	ents, err := os.ReadDir("/proc/self/fd")
+	if err != nil {
+		t.Fatalf("读自身 fd 表失败: %v", err)
+	}
+	const headroom = 8
+	target := uint64(len(ents)) + headroom
+	if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &syscall.Rlimit{Cur: target, Max: orig.Max}); err != nil {
+		t.Fatalf("收紧 RLIMIT_NOFILE 到 %d 失败: %v", target, err)
+	}
+	// 回读内核账本确认真的收紧了：读错就是测到「没耗尽」的假路径。
 	var limit syscall.Rlimit
 	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &limit); err != nil {
 		t.Fatalf("读取 RLIMIT_NOFILE 失败: %v", err)
 	}
-	if limit.Cur > 8 {
-		t.Fatalf("RLIMIT_NOFILE=%d，期望 ≤8（ulimit -n 未生效）", limit.Cur)
+	if limit.Cur != target {
+		t.Fatalf("RLIMIT_NOFILE=%d，期望 %d（预算未生效）", limit.Cur, target)
+	}
+	// 显式耗尽到 EMFILE，再放回 1 个空位：不依赖任何「减一刚好够/不够」的算术假设。
+	var held []*os.File
+	for {
+		f, err := os.Open(os.DevNull)
+		if err != nil {
+			if !errors.Is(err, syscall.EMFILE) {
+				t.Fatalf("fd 耗尽时 open 失败原因不是 EMFILE: %v", err)
+			}
+			break
+		}
+		held = append(held, f)
+	}
+	if len(held) == 0 {
+		t.Fatalf("软限 %d 下没有任何空位被耗尽，预算未生效", target)
+	}
+	_ = held[len(held)-1].Close()
+	held = held[:len(held)-1]
+	// 正控：空位只剩 1 个，fork/exec 的 2 个 pipe fd 必然拿不到。exec 若仍成功、
+	// 或失败原因不是 EMFILE，都说明没测到真实耗尽路径 —— 直接失败，不静默通过。
+	if _, err := exec.Command("true").Output(); err == nil {
+		t.Fatalf("RLIMIT_NOFILE=%d 下 exec 仍成功，未构成真实 fd 耗尽", target)
+	} else if !errors.Is(err, syscall.EMFILE) {
+		t.Fatalf("RLIMIT_NOFILE=%d 下 exec 失败原因不是 EMFILE: %v", target, err)
 	}
 	const workers = 32
 	var wg sync.WaitGroup
