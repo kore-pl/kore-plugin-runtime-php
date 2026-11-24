@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -68,6 +69,35 @@ func TestResourceExhaustionCommandOutputFlood(t *testing.T) {
 	}
 }
 
+// dropInheritedFDs 关闭从外层 shell / make 链继承来的 fd（fd ≥ 3 且未置 FD_CLOEXEC）。
+//
+// 为什么必须做：预算按「自身已开 fd + headroom」算，继承 fd 虽已计入总数，却会挤占
+// Go runtime / race detector 可能懒创建的余量；外层嵌套越深（make check → sh → make →
+// go test → 本 helper），继承 fd 越多，余量越不可预测。关掉之后 fd 表只由本进程决定，
+// 预算与宿主继承 fd、shell 层数彻底解耦（与 site 用例的 markInheritedFDsCloseOnExec 同源）。
+func dropInheritedFDs(t *testing.T) {
+	t.Helper()
+	ents, err := os.ReadDir("/proc/self/fd")
+	if err != nil {
+		t.Fatalf("读取自身 fd 表失败: %v", err)
+	}
+	dropped := 0
+	for _, ent := range ents {
+		fd, convErr := strconv.Atoi(ent.Name())
+		if convErr != nil || fd < 3 {
+			continue
+		}
+		flags, _, errno := syscall.Syscall(syscall.SYS_FCNTL, uintptr(fd), syscall.F_GETFD, 0)
+		if errno != 0 || flags&syscall.FD_CLOEXEC != 0 {
+			continue
+		}
+		if closeErr := syscall.Close(fd); closeErr == nil {
+			dropped++
+		}
+	}
+	t.Logf("关闭继承 fd %d 个（预算只按本进程 fd 表计算）", dropped)
+}
+
 // TestResourceExhaustionLowFileDescriptors 资源耗尽（真实注入）：重跑本测试二进制，
 // 由 helper 以「自身已开 fd 数」为基线把 RLIMIT_NOFILE 收紧到 +1，在真实 fd 枯竭下
 // 并发调用 versions。插件必须把 exec 失败当候选失败跳过，按降级契约返回合法 JSON
@@ -121,6 +151,8 @@ func TestResourceLowFDHelper(t *testing.T) {
 	}
 	_ = pr.Close()
 	_ = pw.Close()
+	// 先清掉外层继承的 fd，再测量预算：否则同一用例在不同 shell 嵌套层数下余量不同。
+	dropInheritedFDs(t)
 	var orig syscall.Rlimit
 	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &orig); err != nil {
 		t.Fatalf("读取 RLIMIT_NOFILE 失败: %v", err)
