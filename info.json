@@ -1,7 +1,7 @@
 {
   "id": "runtime-php",
   "name": "PHP 运行时插件",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "protocol": "kore.plugin.v1",
   "lifecycle": "lazy",
   "depth_level": "production",

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1] - 2026-11-25
+
+### Docs / 配置（patch）
+
+- 完善开源工程标准化：新增简体中文 / English / Español / Français / Deutsch / Русский / Português 七语言 DETAIL 文档与 locale 元数据，新增 SECURITY 六语译文、dependabot 与 CODEOWNERS，README 顶部加语言切换行与 Star 提示。
+- 补充 Git Flow 分支模型与安全披露约定，GitHub CI 改为仅手动触发、新增 Gitea 按版本 tag 触发。
+- 本地签名 tag v0.3.1（工程标准化，不改运行时版本）；历史 tag 不改动、不重签、不推送。
+
 ## [0.3.0] - 2026-11-25
 
 ### Added
