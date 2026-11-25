@@ -82,3 +82,14 @@
 - refactor: 方法名按协议统一为 `<plugin-id>.<action>`（原 `php.*` → `runtime-php.*`），移除裸动词与旧域前缀兼容
 - feat: 四类故障注入测试（kill -9 / 超时 / 磁盘满 / cgroup 超限），验证方法级错误返回
 - build: 确定性打包（--sort=name --mtime=@0 --owner=0 --numeric-owner + gzip -9n + chmod 归一），GOWORK=off 构建
+
+## [v0.3.1] - 2026-11-25
+
+### Added
+
+- 补齐开源工程标准化：新增简体中文 / English / Español / Français / Deutsch / Русский / Português 七语言文档（`locale/` 与 `docs/DETAIL*`）、安全与依赖更新配置（dependabot / CODEOWNERS / SECURITY 译文）、贡献指南的分支模型说明，以及中文 CHANGELOG 语义化版本条目。
+- 新增本地 `develop` 分支约定与 SSH 签名 tag 约定（历史 tag 不动）。
+
+### Changed
+
+- README 增加七语言切换行与 Star 支持提示；对应版本标签 `v0.3.1` 仅作为工程标准化发布标识，`info.json` / `manifest.json` 的运行时版本与 `dist` 产物保持不变，避免发布包 sha 漂移。
