@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Plugin de runtime do PHP",
+    "description": "Detecta a CLI do PHP instalada no host, resume os detalhes das versões, varre projetos e executa verificações de saúde; oferece fixação da versão padrão e um daemon local de processo único, sem incluir o binário do PHP.",
+    "detail": "docs/DETAIL.pt.md"
+  }
+}

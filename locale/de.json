@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "PHP-Laufzeit-Plugin",
+    "description": "Erkennt die installierte PHP-CLI des Hosts, fasst Versionsdetails zusammen, scannt Projekte und führt Gesundheitsprüfungen durch; unterstützt das Festlegen der Standardversion und einen lokalen Einzelprozess-Daemon ohne mitgelieferte PHP-Binärdatei.",
+    "detail": "docs/DETAIL.de.md"
+  }
+}

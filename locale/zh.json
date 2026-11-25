@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "PHP 运行时插件",
+    "description": "真实检测宿主 PHP CLI、汇总版本详情、扫描项目并做健康检查；支持默认版本切换与单机单进程守护，不内置 php 二进制。",
+    "detail": "docs/DETAIL.md"
+  }
+}

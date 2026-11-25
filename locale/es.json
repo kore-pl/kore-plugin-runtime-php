@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Complemento de entorno de ejecución de PHP",
+    "description": "Detecta la CLI de PHP instalada en el host, resume los detalles de versión, analiza proyectos y realiza comprobaciones de salud; admite fijar la versión predeterminada y un demonio local de un solo proceso, sin incluir el binario de PHP.",
+    "detail": "docs/DETAIL.es.md"
+  }
+}

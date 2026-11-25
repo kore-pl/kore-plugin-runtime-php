@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Plugin d'exécution PHP",
+    "description": "Détecte la CLI PHP installée sur l'hôte, détaille les versions, analyse les projets et effectue des contrôles de santé ; prend en charge l'épinglage de la version par défaut et un démon local à processus unique, sans embarquer le binaire PHP.",
+    "detail": "docs/DETAIL.fr.md"
+  }
+}

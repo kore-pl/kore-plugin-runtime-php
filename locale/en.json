@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "PHP Runtime Plugin",
+    "description": "Detects installed PHP CLI, reports version details, scans projects and runs health checks; supports default-version pinning and a local single-process daemon, with no bundled php binary.",
+    "detail": "docs/DETAIL.en.md"
+  }
+}
