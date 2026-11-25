@@ -1,13 +1,17 @@
 # kore-plugin-runtime-php
 
 PHP 运行时插件（**生产级**）：真实检测宿主已安装的 PHP CLI、汇总单版本详情、
-扫描 PHP 项目并做健康检查。只读元数据——**不执行项目脚本、不写宿主文件、不内置 php 二进制**。
+扫描 PHP 项目并做健康检查；0.3.0 起补**默认版本切换**与**单进程守护**
+（启动 / 停止 / 重启 / 状态 / 日志尾部）。**不内置 php 二进制、不引入常驻中间件、不做容器编排**：
+守护没有 supervisor 进程，被守护应用 setsid 脱离会话独立运行，状态全部落盘。
 
 ## 协议面
 
-- `kore.plugin.v1`，`lifecycle=lazy`，`depth_level=production`，插件级能力 `system:admin`（仅作未声明方法的 fail-closed 回退）
-- **方法级能力**（`method_capabilities`）：5 个方法全为 `system:read`——只读探测无需管理权限，内核据此不再把只读调用计入写审计
-- 方法：`runtime-php.versions` / `runtime-php.info` / `runtime-php.projects` / `runtime-php.doctor` / `runtime-php.paths`
+- `kore.plugin.v1`，`lifecycle=lazy`，`depth_level=production`，插件级能力 `system:admin` + `proc:write`（后者是守护启停真实进程所需；方法级能力只能收窄、不能跨域放大）
+- **方法级能力**（`method_capabilities`，13 条）：只读探测 / 列表 / 日志 = `system:read`；
+  版本钉住与守护配置增删 = `system:admin`；`guard.start` / `guard.stop` / `guard.restart` = `proc:write`
+- 方法：`versions` / `info` / `projects` / `doctor` / `paths` / `use` /
+  `guard.add` / `guard.list` / `guard.start` / `guard.stop` / `guard.restart` / `guard.remove` / `guard.logs`
   （域必须等于插件 id `runtime-php`，PLUGIN-PROTOCOL §7.2；不接受裸动词或旧 `php.` 前缀）
 - 握手的 stdout 留给协议帧，日志一律写 stderr；未知方法 `E_NOTFOUND`，参数非法 `E_INVALID`
 - 运行期配置：`KORE_PHP_ROOT`（插件状态目录，默认 `/var/lib/kore/php`，同时是 root 白名单的一项）
@@ -138,8 +142,27 @@ PHP 运行时插件（**生产级**）：真实检测宿主已安装的 PHP CLI�
 - `search_order` 的条目顺序 = 实际探测优先级（PATH → phpenv → 常见路径），只列**真实存在**的来源；同一路径只列一次（软链仍按来源保留，便于解释多版本来源）
 - 未检测到 PHP 时不报错：`default.found=false`、`search_order=[]`，并给与 `versions` 相同的 `hint`
 
+> 测试补充：`guard_test.go`（假 `GuardIO`，不拉起真实进程）覆盖零参数启动（G-33 A1）、start 幂等、
+> start/stop/restart 状态流转、SIGTERM 无效升级 SIGKILL、日志尾部、应用名 / 目录越界 / `..` 穿越 /
+> 脚本缺失的「怎么办」文案、退出码落盘、版本钉住与清除。
+
+### `runtime-php.use {version?}` 与进程守护（`guard.*`）
+
+与 runtime-node 同一套契约：
+
+- `use {version?}`：把已安装的 PHP 钉为默认（写 `<state>/default-version.json`，不改宿主 PATH）；
+  `versions` 的 `pinned_version` / `pinned_path` 回显
+- `guard.add {name, dir, script, args?, version?}`：注册应用（`script` 通常是 `index.php`）；
+  `dir` 走白名单 + 软链二次校验，`name` 匹配 `^[a-z][a-z0-9-]{0,31}$`
+- `guard.start {names?}`（幂等，零参数 = 全部）/ `guard.stop {names?}`（SIGTERM 进程组 → 5s 后 SIGKILL）/
+  `guard.restart {name}` / `guard.list` / `guard.logs {name, lines?}`（≤500 行 / 64 KiB）/ `guard.remove {name}`
+- **诚实边界**：不自动重启（无常驻 supervisor）；进程退出后显示 `crashed` + `exit_code`；
+  需要「挂了自动起」用 cron 插件定时调幂等的 `guard.start`；不做编排（单机单进程，上限 32 个应用）
+
 ## 安全模型
 
+- **守护的进程边界**：固定 argv（无 shell）、工作目录限定白名单、子进程环境**剔除全部 `KORE_*`**、
+  日志 0640 / 守护目录 0750；PID 存活用「PID + 启动时刻」双判据，`Z` / `X` 状态判为不在运行
 - **root 白名单**：`/var/www`、`/opt`、`/home` + 插件状态目录（`KORE_PHP_ROOT`，默认 `/var/lib/kore/php`）
 - **两层归属校验**：词法层（绝对路径、无 NUL / 反斜杠 / `..`、在白名单内）+ 真实层（`EvalSymlinks` 后再次比对，
   挡住"白名单目录本身或父级被换成软链"的逃逸）；`root` 必须是已存在的目录

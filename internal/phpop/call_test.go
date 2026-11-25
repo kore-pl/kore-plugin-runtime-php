@@ -27,7 +27,7 @@ func (s stubExecutor) Projects(string) (ProjectsResult, error) {
 func (s stubExecutor) Doctor(string) (DoctorResult, error) { return s.doctor, s.err }
 func (s stubExecutor) Paths() (PathsResult, error)         { return s.paths, s.err }
 
-// TestBusinessVerb 方法名归一化：只接受 runtime-php.<五个动词>（含 paths）。
+// TestBusinessVerb 方法名归一化：只接受 runtime-php.<13 个动词>（含 paths / use / guard.*）。
 func TestBusinessVerb(t *testing.T) {
 	cases := map[string]string{
 		"runtime-php.versions": "versions",
@@ -35,6 +35,15 @@ func TestBusinessVerb(t *testing.T) {
 		"runtime-php.projects": "projects",
 		"runtime-php.doctor":   "doctor",
 		"runtime-php.paths":    "paths",
+		"runtime-php.use":      "use",
+
+		"runtime-php.guard.add":     "guard.add",
+		"runtime-php.guard.list":    "guard.list",
+		"runtime-php.guard.start":   "guard.start",
+		"runtime-php.guard.stop":    "guard.stop",
+		"runtime-php.guard.restart": "guard.restart",
+		"runtime-php.guard.remove":  "guard.remove",
+		"runtime-php.guard.logs":    "guard.logs",
 	}
 	for method, want := range cases {
 		got, ok := businessVerb(method)
@@ -42,7 +51,7 @@ func TestBusinessVerb(t *testing.T) {
 			t.Fatalf("businessVerb(%q)=(%q,%v)，期望 (%q,true)", method, got, ok, want)
 		}
 	}
-	for _, method := range []string{"runtime-php.use", "runtime-php.exec", "runtime-php.allocatePort", "php.versions", "versions", "runtime-php."} {
+	for _, method := range []string{"runtime-php.exec", "runtime-php.allocatePort", "php.versions", "versions", "runtime-php.", "runtime-php.guard", "runtime-php.guard.exec"} {
 		if _, ok := businessVerb(method); ok {
 			t.Fatalf("businessVerb(%q) 不应被接受", method)
 		}
@@ -169,7 +178,7 @@ func TestCallParamValidation(t *testing.T) {
 
 // TestCallUnknownMethod 未声明的方法与跨域方法一律 E_NOTFOUND。
 func TestCallUnknownMethod(t *testing.T) {
-	for _, method := range []string{"runtime-php.use", "runtime-php.exec", "php.versions", "runtime-php"} {
+	for _, method := range []string{"runtime-php.install", "runtime-php.exec", "php.versions", "runtime-php.guard"} {
 		_, perr := Call(method, json.RawMessage(`{}`), "", stubExecutor{})
 		if perr == nil || perr.Code != pluginapi.E_NOTFOUND {
 			t.Fatalf("Call(%q) 错误=%v，期望 E_NOTFOUND", method, perr)

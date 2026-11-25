@@ -127,6 +127,8 @@ type PHPVersion struct {
 type VersionsResult struct {
 	Versions       []PHPVersion `json:"versions"`
 	DefaultVersion string       `json:"default_version"`
+	PinnedVersion  string       `json:"pinned_version,omitempty"`
+	PinnedPath     string       `json:"pinned_path,omitempty"`
 	Count          int          `json:"count"`
 	Hint           string       `json:"hint,omitempty"`
 }

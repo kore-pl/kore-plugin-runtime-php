@@ -1,24 +1,42 @@
 {
   "id": "runtime-php",
   "name": "PHP 运行时插件",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "protocol": "kore.plugin.v1",
   "lifecycle": "lazy",
   "depth_level": "production",
   "entry": "bin/runtime-php",
-  "capabilities": ["system:admin"],
+  "capabilities": [
+    "system:admin",
+    "proc:write"
+  ],
   "method_capabilities": {
     "runtime-php.versions": "system:read",
     "runtime-php.info": "system:read",
     "runtime-php.projects": "system:read",
     "runtime-php.doctor": "system:read",
-    "runtime-php.paths": "system:read"
+    "runtime-php.paths": "system:read",
+    "runtime-php.use": "system:admin",
+    "runtime-php.guard.add": "system:admin",
+    "runtime-php.guard.remove": "system:admin",
+    "runtime-php.guard.list": "system:read",
+    "runtime-php.guard.logs": "system:read",
+    "runtime-php.guard.start": "proc:write",
+    "runtime-php.guard.stop": "proc:write",
+    "runtime-php.guard.restart": "proc:write"
   },
   "triggers": [],
   "requires_kore": ">=0.1.0 <0.2.0",
-  "resources": {"memory_mb": 6, "cpu_quota": "15%", "pids_max": 24},
+  "resources": {
+    "memory_mb": 6,
+    "cpu_quota": "15%",
+    "pids_max": 24
+  },
   "depends_on": [],
   "conflicts": [],
-  "scenario_tags": ["web", "app"],
+  "scenario_tags": [
+    "web",
+    "app"
+  ],
   "size_bytes": 1506123
 }

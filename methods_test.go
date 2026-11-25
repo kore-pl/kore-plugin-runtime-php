@@ -81,7 +81,7 @@ func TestDispatchReject(t *testing.T) {
 		{"runtime-php.projects", `{}`, pluginapi.E_INVALID},
 		{"runtime-php.projects", `{"root":"/etc"}`, pluginapi.E_INVALID},
 		{"runtime-php.doctor", `{"root":"/etc"}`, pluginapi.E_INVALID},
-		{"runtime-php.use", `{"version":"8.1"}`, pluginapi.E_NOTFOUND},
+		{"runtime-php.install", `{"version":"8.1"}`, pluginapi.E_NOTFOUND},
 		{"runtime-php.exec", `{}`, pluginapi.E_NOTFOUND},
 	}
 	for _, c := range cases {

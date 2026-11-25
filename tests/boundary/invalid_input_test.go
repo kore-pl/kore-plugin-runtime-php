@@ -47,7 +47,7 @@ func TestInvalidInputRejectsMalformedParams(t *testing.T) {
 		{"doctor-outside-whitelist", "runtime-php.doctor", `{"root":"/etc"}`, pluginapi.E_INVALID},
 		{"doctor-unknown-field", "runtime-php.doctor", `{"unknown":true}`, pluginapi.E_INVALID},
 		// 未声明方法 / 跨域方法：必须是 E_NOTFOUND，不能误派发到业务动词。
-		{"unknown-method-use", "runtime-php.use", `{}`, pluginapi.E_NOTFOUND},
+		{"unknown-method-install", "runtime-php.install", `{}`, pluginapi.E_NOTFOUND},
 		{"unknown-method-exec", "runtime-php.exec", `{}`, pluginapi.E_NOTFOUND},
 		{"foreign-domain", "php.versions", `{}`, pluginapi.E_NOTFOUND},
 		{"bare-prefix", "runtime-php", `{}`, pluginapi.E_NOTFOUND},
