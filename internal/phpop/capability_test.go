@@ -42,6 +42,11 @@ var expectedCapabilities = map[string]string{
 	"guard.start":   "proc:write",
 	"guard.stop":    "proc:write",
 	"guard.restart": "proc:write",
+	// 扩展管理只写插件状态目录的隔离前缀，不碰宿主 php / apt 全局：
+	// 写操作 = system:admin，只读列表 = system:read。
+	"ext.install": "system:admin",
+	"ext.list":    "system:read",
+	"ext.remove":  "system:admin",
 }
 
 // TestMethodCapabilitiesMatchDispatch 双向校验 info.json 的方法级能力声明与分发表：

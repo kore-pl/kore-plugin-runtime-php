@@ -1,7 +1,7 @@
 {
   "id": "runtime-php",
   "name": "PHP 运行时插件",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "protocol": "kore.plugin.v1",
   "lifecycle": "lazy",
   "depth_level": "production",
@@ -23,7 +23,10 @@
     "runtime-php.guard.logs": "system:read",
     "runtime-php.guard.start": "proc:write",
     "runtime-php.guard.stop": "proc:write",
-    "runtime-php.guard.restart": "proc:write"
+    "runtime-php.guard.restart": "proc:write",
+    "runtime-php.ext.install": "system:admin",
+    "runtime-php.ext.list": "system:read",
+    "runtime-php.ext.remove": "system:admin"
   },
   "triggers": [],
   "requires_kore": ">=0.1.0 <0.2.0",

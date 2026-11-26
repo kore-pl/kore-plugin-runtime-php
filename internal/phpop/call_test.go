@@ -27,7 +27,7 @@ func (s stubExecutor) Projects(string) (ProjectsResult, error) {
 func (s stubExecutor) Doctor(string) (DoctorResult, error) { return s.doctor, s.err }
 func (s stubExecutor) Paths() (PathsResult, error)         { return s.paths, s.err }
 
-// TestBusinessVerb 方法名归一化：只接受 runtime-php.<13 个动词>（含 paths / use / guard.*）。
+// TestBusinessVerb 方法名归一化：只接受 runtime-php.<16 个动词>（含 paths / use / guard.* / ext.*）。
 func TestBusinessVerb(t *testing.T) {
 	cases := map[string]string{
 		"runtime-php.versions": "versions",
@@ -44,6 +44,10 @@ func TestBusinessVerb(t *testing.T) {
 		"runtime-php.guard.restart": "guard.restart",
 		"runtime-php.guard.remove":  "guard.remove",
 		"runtime-php.guard.logs":    "guard.logs",
+
+		"runtime-php.ext.install": "ext.install",
+		"runtime-php.ext.list":    "ext.list",
+		"runtime-php.ext.remove":  "ext.remove",
 	}
 	for method, want := range cases {
 		got, ok := businessVerb(method)
