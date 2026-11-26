@@ -1,7 +1,7 @@
 {
   "id": "runtime-php",
   "name": "PHP 运行时插件",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "protocol": "kore.plugin.v1",
   "lifecycle": "lazy",
   "depth_level": "production",
@@ -38,5 +38,5 @@
     "web",
     "app"
   ],
-  "size_bytes": 1566319
+  "size_bytes": 1566387
 }
