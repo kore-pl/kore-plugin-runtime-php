@@ -219,35 +219,44 @@ func (f extFaultFake) RemovePackages(string, []string) (ExtRemoveResult, error) 
 	return ExtRemoveResult{}, NewFaultError(f.kind, "ext.remove 执行面故障")
 }
 
-// TestExtFaultInjection 三类扩展方法 × 四类故障 × 一个空态净化用例：
+// TestExtFaultInjection 四类故障 × 三方法的 12 组合全覆盖：
 // 每格断言结果 nil + 错误码 + 类别关键词，杜绝"永远失败"的假通过。
 func TestExtFaultInjection(t *testing.T) {
-	cases := []struct {
+	kinds := []struct {
 		kind     FaultKind
 		wantCode string
 		wantHint string
-		method   string
-		params   string
 	}{
-		{FaultKill, pluginapi.E_UPSTREAM, "信号 9", "runtime-php.ext.install", `{"packages":["redis"]}`},
-		{FaultTimeout, pluginapi.E_UPSTREAM, "超时", "runtime-php.ext.list", `{}`},
-		{FaultDisk, pluginapi.E_INTERNAL, "磁盘满", "runtime-php.ext.remove", `{"packages":["redis"]}`},
-		{FaultCgroup, pluginapi.E_UNSUPPORTED, "cgroup", "runtime-php.ext.install", `{"packages":["redis"]}`},
+		{FaultKill, pluginapi.E_UPSTREAM, "信号 9"},
+		{FaultTimeout, pluginapi.E_UPSTREAM, "超时"},
+		{FaultDisk, pluginapi.E_INTERNAL, "磁盘满"},
+		{FaultCgroup, pluginapi.E_UNSUPPORTED, "cgroup"},
 	}
-	for _, c := range cases {
-		t.Run(string(c.kind)+"-"+c.method, func(t *testing.T) {
-			root := t.TempDir()
-			result, perr := Call(c.method, json.RawMessage(c.params), root, extFaultFake{kind: c.kind})
-			if perr == nil {
-				t.Fatalf("%s 注入 %s 后未返回错误（结果=%s）", c.method, c.kind, result)
-			}
-			if result != nil {
-				t.Fatalf("%s 出错时不应带结果: %s", c.method, result)
-			}
-			if perr.Code != c.wantCode || !strings.Contains(perr.Message, c.wantHint) {
-				t.Fatalf("%s 注入 %s 错误=%+v，期望 code=%s 含 %q", c.method, c.kind, perr, c.wantCode, c.wantHint)
-			}
-		})
+	methods := []struct {
+		method string
+		params string
+	}{
+		{"runtime-php.ext.install", `{"packages":["redis"]}`},
+		{"runtime-php.ext.list", `{}`},
+		{"runtime-php.ext.remove", `{"packages":["redis"]}`},
+	}
+	for _, k := range kinds {
+		for _, m := range methods {
+			k, m := k, m
+			t.Run(string(k.kind)+"-"+m.method, func(t *testing.T) {
+				root := t.TempDir()
+				result, perr := Call(m.method, json.RawMessage(m.params), root, extFaultFake{kind: k.kind})
+				if perr == nil {
+					t.Fatalf("%s 注入 %s 后未返回错误（结果=%s）", m.method, k.kind, result)
+				}
+				if result != nil {
+					t.Fatalf("%s 出错时不应带结果: %s", m.method, result)
+				}
+				if perr.Code != k.wantCode || !strings.Contains(perr.Message, k.wantHint) {
+					t.Fatalf("%s 注入 %s 错误=%+v，期望 code=%s 含 %q", m.method, k.kind, perr, k.wantCode, k.wantHint)
+				}
+			})
+		}
 	}
 }
 
