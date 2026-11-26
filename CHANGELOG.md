@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0] - 2026-11-26
+
+### Added
+
+- **运行时扩展管理（隔离安装，不碰宿主）**：新增 `runtime-php.ext.install` / `ext.list` / `ext.remove` 三方法（C13 隔离方案，照 Node 已验收范本）。固定 argv（`pecl install -d extension_dir=<state>/global/php_ext <包名...>` / `pecl uninstall <包名...>`）+ 扩展包名白名单（字母数字 . _ - 与可选 `-版本`，挡空格/分号/斜杠/选项注入）+ 状态目录路径与软链逃逸校验 + 120s 超时 + 输出 64 KiB 首尾截断 + 假执行面注入单测；production 等级的四类故障（kill/timeout/disk/cgroup）× 三方法 fault 注入全覆盖，附无故障 sanity 防假通过。
+- 安装前缀固定为 `<state>/global/php_ext`，**绝不 `apt install php-*`、不写宿主 php 扩展目录、不新增 root_action、不动 rootpolicy 形状表**；`info.json.method_capabilities` 同步三条（install/remove = `system:admin`，list = `system:read`）。
+- 主壳 `web/runtimes.js` 的 PHP tab 复用 Node 扩展管理分区（两 tab 共用一套面板与包名助手，仅文案按运行时切换，零新增一级控件 / hub / CSS），遵守「加一个控件替换一个」减法；首屏体积不退化（90924 B ≤ 300 KiB）。
+
 ## [0.3.2] - 2026-11-26
 
 ### Fixed
