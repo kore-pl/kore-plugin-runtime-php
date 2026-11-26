@@ -11,7 +11,7 @@ import (
 func callPaths(params json.RawMessage, exec Executor) (json.RawMessage, *pluginapi.Error) {
 	var p pathsParams
 	if err := strictUnmarshal(params, &p); err != nil {
-		return nil, invalid("runtime-php.paths 参数非法: " + err.Error())
+		return nil, invalid("runtime-php.paths 参数有误，请检查后重试: " + err.Error())
 	}
 	result, err := exec.Paths()
 	if err != nil {

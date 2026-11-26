@@ -42,17 +42,17 @@ func ValidateRoot(raw, stateRoot string) (string, *pluginapi.Error) {
 		return "", invalid("root 不得含首尾空白")
 	}
 	if strings.ContainsRune(trimmed, 0) {
-		return "", invalid("root 含 NUL 字节")
+		return "", invalid("目录 root 含 NUL 空字符，请去掉后重试")
 	}
 	if strings.Contains(trimmed, "\\") {
-		return "", invalid("root 含反斜杠")
+		return "", invalid("目录 root 含反斜杠，请改用正斜杠 / 的路径")
 	}
 	if !filepath.IsAbs(trimmed) {
-		return "", invalid("root 必须是绝对路径")
+		return "", invalid("目录 root 请填绝对路径（以 / 开头）")
 	}
 	for _, segment := range strings.Split(trimmed, "/") {
 		if segment == ".." {
-			return "", invalid("root 含 .. 段，禁止穿越")
+			return "", invalid("目录 root 含 .. 段，请改用允许目录内的路径")
 		}
 	}
 	clean := filepath.Clean(trimmed)
@@ -73,7 +73,7 @@ func ValidateRoot(raw, stateRoot string) (string, *pluginapi.Error) {
 		}
 	}
 	if !withinAny(realRoots, real) {
-		return "", invalid("root 经符号链接解析后越出允许目录")
+		return "", invalid("目录 root 指向了允许范围之外的位置，请换一个目录")
 	}
 	return real, nil
 }

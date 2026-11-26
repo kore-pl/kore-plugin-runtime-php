@@ -33,7 +33,7 @@ var skipDirs = []string{"vendor", "node_modules", ".git"}
 func callProjects(params json.RawMessage, exec Executor, stateRoot string) (json.RawMessage, *pluginapi.Error) {
 	var p projectsParams
 	if err := strictUnmarshal(params, &p); err != nil {
-		return nil, invalid("runtime-php.projects 参数非法: " + err.Error())
+		return nil, invalid("runtime-php.projects 参数有误，请检查后重试: " + err.Error())
 	}
 	root, perr := ValidateRoot(p.Root, stateRoot)
 	if perr != nil {
